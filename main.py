@@ -91,7 +91,7 @@ if __name__ == "__main__":
     # TODO-me Implement fail safe on useUserInput / UseExternalTestURLs.
     if Config.get('settings', 'useUserInput') == 'true':
         logger.debug('Found useUserInput to be true, asking user for input')
-        userInput = input('Type the FQDN domain name to check (full domain name without http://) example: www.google.com: ')
+        userInput = input('Type the URL to check (full domain url without http://) example: www.google.com : ')
         ExternalTestURLs.append(userInput)
         logger.debug('User entered %s as userInput' % (userInput))
 
@@ -134,20 +134,7 @@ if __name__ == "__main__":
             logger.info ('tracert returned an error, the error has been logged.')
             logger.debug ('tracert error with %s (%s)' % (url, sys.exc_info()))
 
-        #
-        # Legacy code for subprocess.popen line-by-line reading and output
-        #
-        #while True:
-        ##    line = p.stdout.readline()
-        #    if not line: break
-        #    output = '-->',line,
-        #    logger.info(str(output).decode('ASCII')).
-        #p.wait()
-
-
         logger.info ('Ending traceroute to %s' % (url))
-
-        logger.info ('Ending telnet to %s' % (url))
 
         logger.info ('Beginning nslookup for %s' % (url))
         try:
