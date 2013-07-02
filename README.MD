@@ -1,1 +1,0 @@
-** Support Diagnostic Tool
