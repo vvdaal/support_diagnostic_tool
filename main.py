@@ -7,6 +7,8 @@
 
 #
 # Copyright (c) 2013 Vincent van Daal
+# http://www.vincentvandaal.nl
+# https://github.com/VincentvDaal/support_diagnostic_tool
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -30,31 +32,19 @@
 
 __app_name__ = 'Support Diagnostic Tool'
 __app_version__ = '1.0'
-__log_filename__ = 'diagnostics.log'
 
-#
-# This tool offers an easier way to troubleshoot network related issues. It has "Customer Ease" in mind and allows customers without much knowledge
-# to just run this tool in a "Fire and Forget" way and make a log of all results which will then require a analyses by a more knowledgeable person.
-#
-# It checks a domain together with some default much visited domains to debug network related issues such as but not limited to:
-# See if a website gets blocked due to a specific protocol Firewall
-# See if a website gets blocked due to a regular Firewall
-# See if a website doesn't work due to DNS issues or Proxy usage
-#
-# In short this tool should allow you great insight if people are having issues reaching their domain or services in regards to their domain.
-# This tool is originally made and also used by a major dutch Webhosting Company.
-#
-# Made by Vincent van Daal
-# http://www.vincentvandaal.nl
-# https://github.com/VincentvDaal/support_diagnostic_tool
-#
+__log_filename__ = 'diagnostics.log'
 
 
 #
 # Load telnet library
 #
 
-import telnetlib, logging, sys, subprocess, configparser
+import telnetlib
+import logging
+import sys
+import subprocess
+import configparser
 
 Config = configparser.ConfigParser()
 Config.read("config.ini")
@@ -98,9 +88,10 @@ if __name__ == "__main__":
 
     ExternalTestURLs = Config.get('settings', 'ExternalTestURLs').split(',')
 
+    # TODO-me Implement fail safe on useUserInput / UseExternalTestURLs.
     if Config.get('settings', 'useUserInput') == 'true':
         logger.debug('Found useUserInput to be true, asking user for input')
-        userInput = input('Type the FQDN domain name to check (full domain name without http://) example: www.google.com: ');
+        userInput = input('Type the FQDN domain name to check (full domain name without http://) example: www.google.com: ')
         ExternalTestURLs.append(userInput)
         logger.debug('User entered %s as userInput' % (userInput))
 
@@ -110,6 +101,7 @@ if __name__ == "__main__":
     logger.info ('Please wait until the programs states that it has completed all checks this can take a few minutes.')
 
     for url in ExternalTestURLs:
+        # TODO-me Implement MinimumUserInfo.
         logger.info ('Beginning telnet to %s' % (url))
 
         try:
@@ -133,6 +125,9 @@ if __name__ == "__main__":
         logger.info ('Beginning traceroute to %s' % (url))
 
         try:
+            # TODO-me Tweak subprocess handling.
+            # TODO-me Ensure Cross-platform compatibility with subprocess usage.
+
             ef = subprocess.check_output(["tracert", '-d', '-w', '1000', url], shell=False, stderr=None)
             logger.info(ef.decode('ASCII'))
         except:
@@ -140,7 +135,7 @@ if __name__ == "__main__":
             logger.debug ('tracert error with %s (%s)' % (url, sys.exc_info()))
 
         #
-        # Legacy code for subprocess line-by-line reading
+        # Legacy code for subprocess.popen line-by-line reading and output
         #
         #while True:
         ##    line = p.stdout.readline()
@@ -156,6 +151,9 @@ if __name__ == "__main__":
 
         logger.info ('Beginning nslookup for %s' % (url))
         try:
+            # TODO-me Tweak subprocess handling.
+            # TODO-me Ensure Cross-platform compatibility with subprocess usage.
+
             ef = subprocess.check_output(["nslookup", url], shell=False, stderr=None)
             logger.info(ef.decode('ASCII'))
         except:
