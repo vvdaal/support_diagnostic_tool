@@ -31,7 +31,7 @@
 
 
 __app_name__ = 'Support Diagnostic Tool'
-__app_version__ = '1.0'
+__app_version__ = 'V1.0.1-A'
 
 __log_filename__ = 'diagnostics.log'
 
@@ -81,20 +81,19 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 if __name__ == "__main__":
-    logger.info ('---------------------------')
-    logger.info (__app_name__)
-    logger.info (__app_version__)
-    logger.info ('---------------------------')
+    logger.info ('------------------------------------------------------')
+    logger.info (__app_name__ + " " +__app_version__)
+    logger.info ('------------------------------------------------------')
 
     ExternalTestURLs = Config.get('settings', 'ExternalTestURLs').split(',')
 
-    # TODO-me Implement fail safe on useUserInput / UseExternalTestURLs.
-    if Config.get('settings', 'useUserInput') == 'true':
-        logger.debug('Found useUserInput to be true, asking user for input')
+    if Config.get('settings', 'useUserInput') == 'true' or  Config.get('settings', 'UseExternalTestURLs') == 'false':
+        logger.debug('Found useUserInput to be true, asking user for input.')
         userInput = input('Type the URL to check (full domain url without http://) example: www.google.com : ')
         ExternalTestURLs.append(userInput)
         logger.debug('User entered %s as userInput' % (userInput))
-
+    else:
+        logger.debug('useUserInput is false, not asking user for input.')
     logger.debug('Going to check the following URLs: %s' % (', '.join(map(str,ExternalTestURLs))))
 
     logger.info ('Starting diagnostics...')
@@ -107,7 +106,12 @@ if __name__ == "__main__":
         try:
             tn = telnetlib.Telnet(url, 80, 2000)
 
+            #
+            # We will use a HEAD / HTTP1.1 command through Telnet to fetch the result.
+            # This should give more than enough debugging information since it will the responding HTTP status code.
+            #
             gethtml = "HEAD / HTTP/1.1\nHost: %s\nConnection: Close\n\n" % (url)
+
             logger.debug ('Executing following command through tn.write: '+ gethtml)
             tn.write(gethtml.encode('ascii'))
 
@@ -125,10 +129,17 @@ if __name__ == "__main__":
         logger.info ('Beginning traceroute to %s' % (url))
 
         try:
-            # TODO-me Tweak subprocess handling.
-            # TODO-me Ensure Cross-platform compatibility with subprocess usage.
 
-            ef = subprocess.check_output(["tracert", '-d', '-w', '1000', url], shell=False, stderr=None)
+            #
+            # Because Windows uses "tracert" instead of "traceroute" we have to check first what OS we are running the script on.
+            #
+            if(sys.platform.startswith('win')): # Using Windows
+                command = ["tracert", '-d', '-w', '1000', url]
+            else: # Using other than Windows
+                command = ["traceroute", '-n', '-w', '1000', url]
+
+            ef = subprocess.check_output(command, shell=False, stderr=None)
+
             logger.info(ef.decode('ASCII'))
         except:
             logger.info ('tracert returned an error, the error has been logged.')
@@ -138,10 +149,11 @@ if __name__ == "__main__":
 
         logger.info ('Beginning nslookup for %s' % (url))
         try:
-            # TODO-me Tweak subprocess handling.
-            # TODO-me Ensure Cross-platform compatibility with subprocess usage.
-
+            #
+            # NSlookup tool should work the same in every OS.
+            #
             ef = subprocess.check_output(["nslookup", url], shell=False, stderr=None)
+
             logger.info(ef.decode('ASCII'))
         except:
             logger.info ('NSlookup returned an error, the error has been logged.')
@@ -149,8 +161,10 @@ if __name__ == "__main__":
 
         logger.info ('Ending nslookup for %s' % (url))
 
-    logger.info ('---------------------------')
+    logger.info ('------------------------------------------------------')
     logger.info ('Completed all checks - Finished diagnosing')
     logger.info ('')
     logger.info ('%s contains all logging, this file is located in the same directory as this program.' % (__log_filename__))
-    logger.info ('---------------------------')
+    logger.info ('------------------------------------------------------')
+
+    input() # Ensure the Window doesn't close immediately.
