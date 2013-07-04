@@ -45,6 +45,7 @@ import logging
 import sys
 import subprocess
 import configparser
+import time
 
 Config = configparser.ConfigParser()
 Config.read("config.ini")
@@ -70,9 +71,10 @@ ch.setLevel(logging.INFO)
 #
 # Create formatter
 #
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-fh.setFormatter(formatter)
+formatter_ch = logging.Formatter('%(message)s')
+formatter_fh = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter_ch)
+fh.setFormatter(formatter_fh)
 
 #
 # Add the handlers to the logger
@@ -81,13 +83,58 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 if __name__ == "__main__":
-    logger.info ('------------------------------------------------------')
-    logger.info (__app_name__ + " " +__app_version__)
-    logger.info ('------------------------------------------------------')
 
-    ExternalTestURLs = Config.get('settings', 'ExternalTestURLs').split(',')
+    app_header = '------------------------------------------------------\n%s - %s\n------------------------------------------------------' % (__app_name__, __app_version__)
 
-    if Config.get('settings', 'useUserInput') == 'true' or  Config.get('settings', 'UseExternalTestURLs') == 'false':
+    logger.info(app_header)
+
+    #
+    # Try to get useUserInput from the config.ini
+    #
+    try:
+        useUserInput = Config.get('settings', 'useUserInput')
+        logger.debug('Loaded useUserInput from config file.')
+    except:
+        useUserInput = 'true'
+        logger.warning('Could not find useUserInput in config file, using default value.')
+        logger.debug ('Config.get error: %s' % (sys.exc_info()[0]))
+
+    #
+    # Try to get UseExternalTestURLs from the config.ini
+    #
+    try:
+        UseExternalTestURLs = Config.get('settings', 'UseExternalTestURLs')
+        logger.debug('Loaded UseExternalTestURLs from config file.')
+    except:
+        UseExternalTestURLs = 'true'
+        logger.warning('Could not find UseExternalTestURLs in config file, using default value.')
+        logger.debug ('Config.get error: %s' % (sys.exc_info()[0]))
+
+    #
+    # Checks if both UseExternalTestURLs and useUserInput are false
+    # This is not allowed (since the program actually needs to do something)
+    # It will then set useUserInput to true
+    #
+    if UseExternalTestURLs == 'false' and useUserInput == 'false':
+        logger.debug ('Both UseExternalTestURLs and useUserInput are false, this is not allowed, using default value of true for useUserInput')
+        useUserInput = 'true'
+
+    #
+    # Try to get ExternalTestURLs from the config.ini
+    #
+    try:
+        ExternalTestURLs = Config.get('settings', 'ExternalTestURLs').split(',')
+        logger.debug('Loaded ExternalTestURLs from config file.')
+    except:
+        ExternalTestURLs = ['google.com','facebook.com']
+        logger.warning('Could not find ExternalTestURLs in config file, using default values.')
+        logger.debug ('Config.get error: %s' % (sys.exc_info()[0]))
+
+    #
+    # Check if useUserInput is actually true or if UseExternalTestURLs is false or if both useUserInput and UseExternalTestURLs are false
+    # Since the program needs to do something we need to build in this check
+    #
+    if useUserInput == 'true' or UseExternalTestURLs == 'false':
         logger.debug('Found useUserInput to be true, asking user for input.')
         userInput = input('Type the URL to check (full domain url without http://) example: www.google.com : ')
         ExternalTestURLs.append(userInput)
@@ -98,13 +145,23 @@ if __name__ == "__main__":
     logger.debug('Going to check the following URLs: %s' % (', '.join(map(str,ExternalTestURLs))))
 
     logger.info ('Starting diagnostics...')
+    logger.info ('')
+    logger.info ('')
     logger.info ('Please wait until the programs states that it has completed all checks this can take a few minutes.')
-
+    logger.info ('')
+    logger.info ('')
+    time.sleep(1)
+    #
+    # Go through every url in ExternalTestURLs
+    #
     for url in ExternalTestURLs:
         # TODO-me Implement MinimumUserInfo.
         logger.info ('Beginning telnet to %s' % (url))
 
         try:
+            #
+            # Open telnet to the url with port 80, 2 second timeout (2000ms)
+            #
             tn = telnetlib.Telnet(url, 80, 2000)
 
             #
@@ -113,12 +170,22 @@ if __name__ == "__main__":
             #
             gethtml = "HEAD / HTTP/1.1\nHost: %s\nConnection: Close\n\n" % (url)
 
+            #
+            # Write the command requested through telnet to the log but do not display it to the user.
+            #
             logger.debug ('Executing following command through tn.write: '+ gethtml)
             tn.write(gethtml.encode('ascii'))
 
+            #
+            # Read all responses from telnet and ensure proper decoding.
+            #
             logger.info (tn.read_all().decode('ascii'))
 
             logger.debug ('Closing telnet with tn.close()')
+
+            #
+            # Close actual telnet connection
+            #
             tn.close()
 
         except:
@@ -139,9 +206,18 @@ if __name__ == "__main__":
             else: # Using other than Windows
                 command = ["traceroute", '-n', '-w', '1000', url]
 
-            ef = subprocess.check_output(command, shell=False, stderr=None)
+            ef = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE)
+            while True:
+                line = ef.stdout.readline().decode('ASCII')
+                if line != '':
+                    logger.info (line.rstrip())
+                else:
+                    break
 
-            logger.info(ef.decode('ASCII'))
+            #for line in iter(ef.stdout.readline,''):
+            #    logger.info (line.rstrip())
+
+            #logger.info(ef.decode('ASCII'))
         except:
             logger.info ('tracert returned an error, the error has been logged.')
             logger.debug ('tracert error with %s (%s)' % (url, sys.exc_info()))
@@ -149,13 +225,22 @@ if __name__ == "__main__":
         logger.info ('Ending traceroute to %s' % (url))
 
         logger.info ('Beginning nslookup for %s' % (url))
+
         try:
+
             #
             # NSlookup tool should work the same in every OS.
             #
-            ef = subprocess.check_output(["nslookup", url], shell=False, stderr=None)
+            command = ["nslookup", url]
 
-            logger.info(ef.decode('ASCII'))
+            ef = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE)
+            while True:
+                line = ef.stdout.readline().decode('ASCII')
+                if line != '':
+                    logger.info (line.rstrip())
+                else:
+                    break
+
         except:
             logger.info ('NSlookup returned an error, the error has been logged.')
             logger.debug ('NSlookup error with %s (%s)' % (url, sys.exc_info()))
@@ -166,6 +251,11 @@ if __name__ == "__main__":
     logger.info ('Completed all checks - Finished diagnosing')
     logger.info ('')
     logger.info ('%s contains all logging, this file is located in the same directory as this program.' % (__log_filename__))
+    logger.info ('')
+    logger.info ('English: Send the %s file to the Support-Desk.' % (__log_filename__))
+    logger.info ('Dutch: Verstuur het %s bestand naar de Support-Desk.' % (__log_filename__))
+    logger.info ('German: Senden Sie die %s datei zu Support-Desk. ' % (__log_filename__))
+    logger.info ('')
     logger.info ('------------------------------------------------------')
 
     input() # Ensure the Window doesn't close immediately.
