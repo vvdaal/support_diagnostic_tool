@@ -31,7 +31,7 @@
 
 
 __app_name__ = 'Support Diagnostic Tool'
-__app_version__ = 'V1.0.1-A'
+__app_version__ = 'V1.0.1'
 
 __log_filename__ = 'diagnostics.log'
 
@@ -94,6 +94,7 @@ if __name__ == "__main__":
         logger.debug('User entered %s as userInput' % (userInput))
     else:
         logger.debug('useUserInput is false, not asking user for input.')
+        
     logger.debug('Going to check the following URLs: %s' % (', '.join(map(str,ExternalTestURLs))))
 
     logger.info ('Starting diagnostics...')
