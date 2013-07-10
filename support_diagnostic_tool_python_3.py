@@ -2,6 +2,9 @@
 # coding: utf-8
 
 #
+# Written for Python 3
+#
+#
 # Tested with Python 3.3.2
 #
 
@@ -46,6 +49,7 @@ import sys
 import subprocess
 import configparser
 import time
+import urllib.request
 
 Config = configparser.ConfigParser()
 Config.read("config.ini")
@@ -93,8 +97,8 @@ if __name__ == "__main__":
     #
     try:
         useUserInput = Config.get('settings', 'useUserInput')
-        logger.debug('Loaded useUserInput from config file.')
-    except:
+        logger.debug('Loaded useUserInput from config file (Value: %s).' % useUserInput)
+    except configparser.Error:
         useUserInput = 'true'
         logger.warning('Could not find useUserInput in config file, using default value.')
         logger.debug ('Config.get error: %s' % (sys.exc_info()[0]))
@@ -104,10 +108,32 @@ if __name__ == "__main__":
     #
     try:
         UseExternalTestURLs = Config.get('settings', 'UseExternalTestURLs')
-        logger.debug('Loaded UseExternalTestURLs from config file.')
-    except:
+        logger.debug('Loaded UseExternalTestURLs from config file (Value: %s).' % UseExternalTestURLs)
+    except configparser.Error:
         UseExternalTestURLs = 'true'
         logger.warning('Could not find UseExternalTestURLs in config file, using default value.')
+        logger.debug ('Config.get error: %s' % (sys.exc_info()[0]))
+
+    #
+    # Try to get ExternalTestURLs from the config.ini
+    #
+    try:
+        ExternalTestURLs = Config.get('settings', 'ExternalTestURLs').split(',')
+        logger.debug('Loaded ExternalTestURLs from config file (Value: %s).' % ExternalTestURLs)
+    except configparser.Error:
+        ExternalTestURLs = ['google.com','facebook.com']
+        logger.warning('Could not find ExternalTestURLs in config file, using default values.')
+        logger.debug ('Config.get error: %s' % (sys.exc_info()[0]))
+
+    #
+    # Try to get getExternalIpHostname from the config.ini
+    #
+    try:
+        getExternalIPHostname = Config.get('settings', 'getExternalIPHostname')
+        logger.debug('Loaded getExternalIPHostname from config file (Value: %s).' % getExternalIPHostname)
+    except configparser.Error:
+        getExternalIPHostname = 'false'
+        logger.warning('Could not find getExternalIPHostname in config file, using default value.')
         logger.debug ('Config.get error: %s' % (sys.exc_info()[0]))
 
     #
@@ -118,17 +144,6 @@ if __name__ == "__main__":
     if UseExternalTestURLs == 'false' and useUserInput == 'false':
         logger.debug ('Both UseExternalTestURLs and useUserInput are false, this is not allowed, using default value of true for useUserInput')
         useUserInput = 'true'
-
-    #
-    # Try to get ExternalTestURLs from the config.ini
-    #
-    try:
-        ExternalTestURLs = Config.get('settings', 'ExternalTestURLs').split(',')
-        logger.debug('Loaded ExternalTestURLs from config file.')
-    except:
-        ExternalTestURLs = ['google.com','facebook.com']
-        logger.warning('Could not find ExternalTestURLs in config file, using default values.')
-        logger.debug ('Config.get error: %s' % (sys.exc_info()[0]))
 
     #
     # Check if useUserInput is actually true or if UseExternalTestURLs is false or if both useUserInput and UseExternalTestURLs are false
@@ -150,12 +165,28 @@ if __name__ == "__main__":
     logger.info ('Please wait until the programs states that it has completed all checks this can take a few minutes.')
     logger.info ('')
     logger.info ('')
-    time.sleep(1)
+    time.sleep(2)
+
+    #
+    # Get external IP-address and hostname through http://ip2country.sourceforge.net/ip2c.php?format=JSON
+    # Only do this if specified in config.ini
+    #
+    if getExternalIPHostname == 'true':
+        logger.info('Getting IP-address and hostname')
+
+        response = urllib.request.urlopen('http://ip2country.sourceforge.net/ip2c.php?format=JSON')
+        ext_ip_hostname = response.read()
+
+        logger.info(ext_ip_hostname.decode('ascii'))
+    else:
+        logger.debug('Did not try to get IP-address and hostname ')
+
     #
     # Go through every url in ExternalTestURLs
     #
     for url in ExternalTestURLs:
         # TODO-me Implement MinimumUserInfo.
+
         logger.info ('Beginning telnet to %s' % (url))
 
         try:
@@ -199,7 +230,8 @@ if __name__ == "__main__":
         try:
 
             #
-            # Because Windows uses "tracert" instead of "traceroute" we have to check first what OS we are running the script on.
+            # Because Windows uses "tracert" instead of "traceroute"
+            # We have to check first what OS we are running the script on and adjust command if necessary.
             #
             if(sys.platform.startswith('win')): # Using Windows
                 command = ["tracert", '-d', '-w', '1000', url]
@@ -227,11 +259,33 @@ if __name__ == "__main__":
         logger.info ('Beginning nslookup for %s' % (url))
 
         try:
-
             #
             # NSlookup tool should work the same in every OS.
+            # First do a NSlookup through the own users his/her DNS server
             #
             command = ["nslookup", url]
+
+            logger.debug ('Calling %s through Popen' % command)
+
+            ef = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE)
+            while True:
+                line = ef.stdout.readline().decode('ASCII')
+                if line != '':
+                    logger.info (line.rstrip())
+                else:
+                    break
+        except:
+            logger.info ('NSlookup returned an error, the error has been logged.')
+            logger.debug ('NSlookup error with %s (%s)' % (url, sys.exc_info()))
+
+        try:
+            #
+            # NSlookup tool should work the same in every OS.
+            # Second do a NSlookup through the Google DNS server
+            #
+            command = ["nslookup", url, "8.8.8.8"]
+
+            logger.debug ('Calling %s through Popen' % command)
 
             ef = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE)
             while True:
@@ -258,4 +312,7 @@ if __name__ == "__main__":
     logger.info ('')
     logger.info ('------------------------------------------------------')
 
-    input() # Ensure the Window doesn't close immediately.
+    #
+    # Ensures the Window doesn't close immediately.
+    #
+    input()
