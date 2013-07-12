@@ -2,7 +2,7 @@
 # coding: utf-8
 
 #
-# Written for Python 3
+# Written for Python 3.x
 #
 #
 # Tested with Python 3.3.2
@@ -34,7 +34,7 @@
 
 
 __app_name__ = 'Support Diagnostic Tool'
-__app_version__ = 'V1.0.1'
+__app_version__ = 'V1.0.2'
 
 __log_filename__ = 'diagnostics.log'
 
