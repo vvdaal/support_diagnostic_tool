@@ -2,7 +2,7 @@
 # coding: utf-8
 
 #
-# Written for Python 2.7
+# Written for Python 2.x
 #
 
 #
@@ -35,7 +35,7 @@
 
 
 __app_name__ = 'Support Diagnostic Tool'
-__app_version__ = 'V1.0.1'
+__app_version__ = 'V1.0.2'
 
 __log_filename__ = 'diagnostics.log'
 
